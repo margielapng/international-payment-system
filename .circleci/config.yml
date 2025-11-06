@@ -1,0 +1,178 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@5.0.2
+  docker: circleci/docker@2.0.1
+
+workflows:
+  build-and-test:
+    jobs:
+      - lint
+      - security-scan
+      - unit-tests
+      - integration-tests
+      - sonarqube-scan
+      - docker-build-backend:
+          requires:
+            - lint
+            - unit-tests
+            - security-scan
+      - docker-build-frontend:
+          requires:
+            - lint
+      - deploy-staging:
+          requires:
+            - docker-build-backend
+            - docker-build-frontend
+          filters:
+            branches:
+              only: main
+
+jobs:
+  lint:
+    docker:
+      - image: cimg/node:18.12.0
+    steps:
+      - checkout
+      - node/install-packages:
+          pkg-manager: npm
+          cache-version: v1
+      - run:
+          name: Lint backend code
+          command: cd backend && npm run lint
+      - run:
+          name: Lint frontend code
+          command: cd frontend && npm run lint
+
+  security-scan:
+    docker:
+      - image: cimg/node:18.12.0
+    steps:
+      - checkout
+      - node/install-packages:
+          pkg-manager: npm
+          cache-version: v1
+      - run:
+          name: Install security scanning tools
+          command: npm install -g snyk
+      - run:
+          name: Scan backend dependencies
+          command: cd backend && snyk test || true
+      - run:
+          name: Scan frontend dependencies
+          command: cd frontend && snyk test || true
+      - run:
+          name: Check for vulnerable packages
+          command: npm audit --json > audit-report.json || true
+      - store_artifacts:
+          path: audit-report.json
+
+  unit-tests:
+    docker:
+      - image: cimg/node:18.12.0
+      - image: mongo:6.0
+    steps:
+      - checkout
+      - node/install-packages:
+          pkg-manager: npm
+          cache-version: v1
+      - run:
+          name: Run backend unit tests
+          command: cd backend && npm test -- --coverage --testPathPattern=".*\.test\.ts$"
+      - run:
+          name: Run frontend unit tests
+          command: cd frontend && npm test -- --coverage --watchAll=false
+      - store_artifacts:
+          path: backend/coverage
+      - store_artifacts:
+          path: frontend/coverage
+      - store_test_results:
+          path: backend/coverage
+
+  integration-tests:
+    docker:
+      - image: cimg/node:18.12.0
+      - image: mongo:6.0
+    environment:
+      MONGO_URI: mongodb://localhost:27017/secure-payments-test
+    steps:
+      - checkout
+      - node/install-packages:
+          pkg-manager: npm
+          cache-version: v1
+      - run:
+          name: Wait for MongoDB
+          command: sleep 10
+      - run:
+          name: Run integration tests
+          command: cd backend && npm test -- --testPathPattern=".*\.integration\.test\.ts$" || true
+      - store_test_results:
+          path: backend/coverage
+
+  sonarqube-scan:
+    docker:
+      - image: cimg/node:18.12.0
+    steps:
+      - checkout
+      - node/install-packages:
+          pkg-manager: npm
+          cache-version: v1
+      - run:
+          name: Install SonarQube Scanner
+          command: npm install -g sonarqube-scanner
+      - run:
+          name: Run SonarQube analysis
+          command: |
+            sonar-scanner \
+              -Dsonar.projectKey=secure-payments \
+              -Dsonar.host.url=$SONAR_HOST_URL \
+              -Dsonar.login=$SONAR_TOKEN \
+              -Dsonar.sources=backend/src,frontend/src \
+              -Dsonar.exclusions="**/*.test.ts,**/node_modules/**" \
+              || true
+
+  docker-build-backend:
+    docker:
+      - image: cimg/docker:20.10.11
+    steps:
+      - checkout
+      - docker/check
+      - docker/build:
+          image: secure-payments-backend
+          tag: latest,${CIRCLE_SHA1:0:7}
+          dockerfile: backend/Dockerfile
+          path: backend
+      - docker/push:
+          image: secure-payments-backend
+          tag: latest,${CIRCLE_SHA1:0:7}
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
+
+  docker-build-frontend:
+    docker:
+      - image: cimg/docker:20.10.11
+    steps:
+      - checkout
+      - docker/check
+      - docker/build:
+          image: secure-payments-frontend
+          tag: latest,${CIRCLE_SHA1:0:7}
+          dockerfile: frontend/Dockerfile
+          path: frontend
+      - docker/push:
+          image: secure-payments-frontend
+          tag: latest,${CIRCLE_SHA1:0:7}
+
+  deploy-staging:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run:
+          name: Deploy to staging
+          command: |
+            echo "Deploying to staging environment"
+            echo "Backend image: secure-payments-backend:${CIRCLE_SHA1:0:7}"
+            echo "Frontend image: secure-payments-frontend:${CIRCLE_SHA1:0:7}"
