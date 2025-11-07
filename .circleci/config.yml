@@ -1,178 +1,208 @@
 version: 2.1
 
 orbs:
-  node: circleci/node@5.0.2
-  docker: circleci/docker@2.0.1
+  node: circleci/node@5.2.0
+  docker: circleci/docker@2.6.0
+  sonarcloud: sonarsource/sonarcloud@2.0.0
+
+executors:
+  node-executor:
+    docker:
+      - image: cimg/node:20.11.0
+    working_directory: ~/project
+
+jobs:
+  # Install dependencies and cache
+  install-dependencies:
+    executor: node-executor
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "package-lock.json" }}
+            - v1-dependencies-
+      - run:
+          name: Install Dependencies
+          command: npm ci
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-{{ checksum "package-lock.json" }}
+      - persist_to_workspace:
+          root: ~/project
+          paths:
+            - .
+
+  # Lint code
+  lint:
+    executor: node-executor
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - run:
+          name: Run ESLint
+          command: npm run lint
+      - run:
+          name: Check TypeScript
+          command: npx tsc --noEmit
+
+  # Run unit tests
+  test-unit:
+    executor: node-executor
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - run:
+          name: Run Unit Tests
+          command: npm run test:unit
+      - run:
+          name: Generate Coverage Report
+          command: npm run test:coverage
+      - store_test_results:
+          path: ./coverage
+      - store_artifacts:
+          path: ./coverage
+          destination: coverage
+
+  # Run integration tests
+  test-integration:
+    executor: node-executor
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - run:
+          name: Run Integration Tests
+          command: npm run test:integration
+      - store_test_results:
+          path: ./test-results
+
+  # Security audit
+  security-audit:
+    executor: node-executor
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - run:
+          name: NPM Audit
+          command: npm audit --audit-level=moderate
+      - run:
+          name: Check for Vulnerabilities
+          command: npx snyk test --severity-threshold=high || true
+
+  # SonarQube analysis
+  sonarqube-scan:
+    executor: node-executor
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - sonarcloud/scan:
+          cache_version: 1
+          scanner_version: 5.0.1
+
+  # Build application
+  build:
+    executor: node-executor
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - run:
+          name: Build Next.js Application
+          command: npm run build
+      - persist_to_workspace:
+          root: ~/project
+          paths:
+            - .next
+            - public
+
+  # Build Docker image
+  build-docker:
+    executor: docker/docker
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - docker/check
+      - docker/build:
+          image: international-payment-system
+          tag: ${CIRCLE_SHA1},latest
+      - docker/push:
+          image: international-payment-system
+          tag: ${CIRCLE_SHA1},latest
+
+  # Deploy to production
+  deploy-production:
+    executor: node-executor
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - run:
+          name: Deploy to Vercel
+          command: |
+            npm install -g vercel
+            vercel --prod --token=$VERCEL_TOKEN --yes
 
 workflows:
-  build-and-test:
+  version: 2
+  build-test-deploy:
     jobs:
-      - lint
-      - security-scan
-      - unit-tests
-      - integration-tests
-      - sonarqube-scan
-      - docker-build-backend:
+      - install-dependencies
+      
+      - lint:
+          requires:
+            - install-dependencies
+      
+      - test-unit:
+          requires:
+            - install-dependencies
+      
+      - test-integration:
+          requires:
+            - install-dependencies
+      
+      - security-audit:
+          requires:
+            - install-dependencies
+      
+      - sonarqube-scan:
+          requires:
+            - install-dependencies
+            - test-unit
+          context: sonarcloud
+      
+      - build:
           requires:
             - lint
-            - unit-tests
-            - security-scan
-      - docker-build-frontend:
+            - test-unit
+            - test-integration
+            - security-audit
+      
+      - build-docker:
           requires:
-            - lint
-      - deploy-staging:
+            - build
+          filters:
+            branches:
+              only:
+                - main
+                - develop
+      
+      - deploy-production:
           requires:
-            - docker-build-backend
-            - docker-build-frontend
+            - build
+            - sonarqube-scan
           filters:
             branches:
               only: main
 
-jobs:
-  lint:
-    docker:
-      - image: cimg/node:18.12.0
-    steps:
-      - checkout
-      - node/install-packages:
-          pkg-manager: npm
-          cache-version: v1
-      - run:
-          name: Lint backend code
-          command: cd backend && npm run lint
-      - run:
-          name: Lint frontend code
-          command: cd frontend && npm run lint
-
-  security-scan:
-    docker:
-      - image: cimg/node:18.12.0
-    steps:
-      - checkout
-      - node/install-packages:
-          pkg-manager: npm
-          cache-version: v1
-      - run:
-          name: Install security scanning tools
-          command: npm install -g snyk
-      - run:
-          name: Scan backend dependencies
-          command: cd backend && snyk test || true
-      - run:
-          name: Scan frontend dependencies
-          command: cd frontend && snyk test || true
-      - run:
-          name: Check for vulnerable packages
-          command: npm audit --json > audit-report.json || true
-      - store_artifacts:
-          path: audit-report.json
-
-  unit-tests:
-    docker:
-      - image: cimg/node:18.12.0
-      - image: mongo:6.0
-    steps:
-      - checkout
-      - node/install-packages:
-          pkg-manager: npm
-          cache-version: v1
-      - run:
-          name: Run backend unit tests
-          command: cd backend && npm test -- --coverage --testPathPattern=".*\.test\.ts$"
-      - run:
-          name: Run frontend unit tests
-          command: cd frontend && npm test -- --coverage --watchAll=false
-      - store_artifacts:
-          path: backend/coverage
-      - store_artifacts:
-          path: frontend/coverage
-      - store_test_results:
-          path: backend/coverage
-
-  integration-tests:
-    docker:
-      - image: cimg/node:18.12.0
-      - image: mongo:6.0
-    environment:
-      MONGO_URI: mongodb://localhost:27017/secure-payments-test
-    steps:
-      - checkout
-      - node/install-packages:
-          pkg-manager: npm
-          cache-version: v1
-      - run:
-          name: Wait for MongoDB
-          command: sleep 10
-      - run:
-          name: Run integration tests
-          command: cd backend && npm test -- --testPathPattern=".*\.integration\.test\.ts$" || true
-      - store_test_results:
-          path: backend/coverage
-
-  sonarqube-scan:
-    docker:
-      - image: cimg/node:18.12.0
-    steps:
-      - checkout
-      - node/install-packages:
-          pkg-manager: npm
-          cache-version: v1
-      - run:
-          name: Install SonarQube Scanner
-          command: npm install -g sonarqube-scanner
-      - run:
-          name: Run SonarQube analysis
-          command: |
-            sonar-scanner \
-              -Dsonar.projectKey=secure-payments \
-              -Dsonar.host.url=$SONAR_HOST_URL \
-              -Dsonar.login=$SONAR_TOKEN \
-              -Dsonar.sources=backend/src,frontend/src \
-              -Dsonar.exclusions="**/*.test.ts,**/node_modules/**" \
-              || true
-
-  docker-build-backend:
-    docker:
-      - image: cimg/docker:20.10.11
-    steps:
-      - checkout
-      - docker/check
-      - docker/build:
-          image: secure-payments-backend
-          tag: latest,${CIRCLE_SHA1:0:7}
-          dockerfile: backend/Dockerfile
-          path: backend
-      - docker/push:
-          image: secure-payments-backend
-          tag: latest,${CIRCLE_SHA1:0:7}
-      - persist_to_workspace:
-          root: .
-          paths:
-            - .
-
-  docker-build-frontend:
-    docker:
-      - image: cimg/docker:20.10.11
-    steps:
-      - checkout
-      - docker/check
-      - docker/build:
-          image: secure-payments-frontend
-          tag: latest,${CIRCLE_SHA1:0:7}
-          dockerfile: frontend/Dockerfile
-          path: frontend
-      - docker/push:
-          image: secure-payments-frontend
-          tag: latest,${CIRCLE_SHA1:0:7}
-
-  deploy-staging:
-    docker:
-      - image: cimg/base:stable
-    steps:
-      - checkout
-      - run:
-          name: Deploy to staging
-          command: |
-            echo "Deploying to staging environment"
-            echo "Backend image: secure-payments-backend:${CIRCLE_SHA1:0:7}"
-            echo "Frontend image: secure-payments-frontend:${CIRCLE_SHA1:0:7}"
+  # Nightly security scan
+  nightly-security:
+    triggers:
+      - schedule:
+          cron: "0 2 * * *"
+          filters:
+            branches:
+              only: main
+    jobs:
+      - install-dependencies
+      - security-audit:
+          requires:
+            - install-dependencies

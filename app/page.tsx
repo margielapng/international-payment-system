@@ -28,6 +28,30 @@ export default function HomePage() {
   }, [router])
 
   return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      {/* Hero Section */}
+      <div className="container mx-auto px-4 py-16">
+        <div className="flex flex-col items-center text-center space-y-8">
+          <div className="space-y-4">
+            <h1 className="text-5xl md:text-6xl font-bold text-white">
+              Secure International
+              <span className="block text-blue-500">Payment System</span>
+            </h1>
+            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+              Transfer money globally with bank-grade security, real-time verification, and complete transparency
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700">
+              <Link href="/register">Get Started</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/login">Sign In</Link>
+            </Button>
+          </div>
+        </div>
+
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col items-center justify-center px-4">
       <div className="text-center max-w-2xl">
         <h1 className="text-5xl font-bold text-white mb-4">Secure Bank International Payments</h1>
@@ -92,6 +116,48 @@ export default function HomePage() {
               <span className="text-slate-300">Role-Based Access Control</span>
             </div>
           </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-20">
+          <Card className="bg-slate-900/50 border-slate-800">
+            <CardHeader>
+              <Shield className="h-10 w-10 text-blue-500 mb-2" />
+              <CardTitle className="text-white">Bank-Grade Security</CardTitle>
+              <CardDescription>Multi-factor authentication, encryption, and advanced fraud detection</CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-slate-900/50 border-slate-800">
+            <CardHeader>
+              <Globe className="h-10 w-10 text-blue-500 mb-2" />
+              <CardTitle className="text-white">Global Transfers</CardTitle>
+              <CardDescription>Send money to over 150 countries with competitive exchange rates</CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-slate-900/50 border-slate-800">
+            <CardHeader>
+              <Lock className="h-10 w-10 text-blue-500 mb-2" />
+              <CardTitle className="text-white">Compliance First</CardTitle>
+              <CardDescription>Full regulatory compliance with KYC/AML standards and data protection</CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-slate-900/50 border-slate-800">
+            <CardHeader>
+              <Zap className="h-10 w-10 text-blue-500 mb-2" />
+              <CardTitle className="text-white">Fast Processing</CardTitle>
+              <CardDescription>Real-time verification and processing for urgent transfers</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* Employee Portal Link */}
+        <div className="mt-16 text-center">
+          <p className="text-slate-400 mb-4">Are you an employee?</p>
+          <Button asChild variant="ghost" className="text-slate-300 hover:text-white">
+            <Link href="/employee/login">Employee Portal →</Link>
+          </Button>
         </div>
 
         {/* Quick Links */}

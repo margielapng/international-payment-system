@@ -53,35 +53,6 @@ This system allows customers to securely submit international payment requests, 
 - **Auth**: JWT + Refresh Tokens + TOTP MFA
 - **Security**: Helmet, express-rate-limit, bcrypt, speakeasy
 
-### Project Structure
-\`\`\`
-├── backend/
-│   ├── src/
-│   │   ├── controllers/     # Business logic
-│   │   ├── models/          # MongoDB schemas
-│   │   ├── routes/          # API endpoints
-│   │   ├── middleware/      # Auth, security
-│   │   ├── utils/           # JWT, Password, MFA, Audit
-│   │   ├── config/          # Security config
-│   │   └── server.ts        # Express app
-│   ├── tests/               # Unit/integration tests
-│   ├── Dockerfile           # Production build
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── components/      # React components
-│   │   ├── pages/           # Page components
-│   │   ├── styles/          # CSS
-│   │   ├── utils/           # API client, validation
-│   │   └── App.tsx
-│   ├── Dockerfile           # Nginx container
-│   └── package.json
-├── .circleci/
-│   └── config.yml           # CI/CD pipeline
-├── docker-compose.yml       # Local development
-└── SECURITY.md              # Security documentation
-\`\`\`
-
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -93,7 +64,7 @@ This system allows customers to securely submit international payment requests, 
 
 1. **Clone the repository**
 \`\`\`bash
-git clone https://github.com/yourusername/secure-payments.git
+git clone https://github.com/...(to be added)
 cd secure-payments
 \`\`\`
 
