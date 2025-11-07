@@ -1,74 +1,108 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import axios from "axios"
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+type Transaction = {
+  id: string;
+  amount: string | number;
+  currency: string;
+  payeeAccountName?: string;
+  payeeSwiftCode?: string;
+  status?: string;
+  [key: string]: any;
+};
+
+type Verifications = Record<string, boolean>;
 
 export default function EmployeeDashboard() {
-  const navigate = useNavigate()
-  const user = JSON.parse(localStorage.getItem("user") || "{}")
-  const [transactions, setTransactions] = useState([])
-  const [verifications, setVerifications] = useState({})
-  const [loading, setLoading] = useState(true)
+  const router = useRouter();
+
+  // Safely read user from localStorage (client-only)
+  let parsedUser: { username?: string; id?: string; role?: string } = {};
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+    parsedUser = raw ? JSON.parse(raw) : {};
+  } catch {
+    parsedUser = {};
+  }
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [verifications, setVerifications] = useState<Verifications>({});
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    fetchTransactions()
-  }, [])
+    fetchTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchTransactions = async () => {
+    setLoading(true);
     try {
-      const token = localStorage.getItem("accessToken")
-      const response = await axios.get(`${API_URL}/api/transactions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setTransactions(response.data || [])
-    } catch (error) {
-      console.error("Failed to fetch transactions:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
-  const handleVerify = (transactionId) => {
-    setVerifications({
-      ...verifications,
-      [transactionId]: !verifications[transactionId],
-    })
-  }
+      const resp = await axios.get<Transaction[]>(`${API_URL}/api/transactions`, { headers });
+      setTransactions(Array.isArray(resp.data) ? resp.data : []);
+    } catch (err) {
+      console.error("Failed to fetch transactions:", err);
+      setTransactions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify = (transactionId: string) => {
+    setVerifications((prev) => ({
+      ...prev,
+      [transactionId]: !prev[transactionId],
+    }));
+  };
 
   const handleSubmitToSwift = async () => {
     try {
-      const token = localStorage.getItem("accessToken")
-      const verifiedTransactions = Object.keys(verifications).filter((id) => verifications[id])
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+      const verifiedTransactions = Object.keys(verifications).filter((id) => verifications[id]);
+
+      if (verifiedTransactions.length === 0) {
+        alert("No transactions selected for submission.");
+        return;
+      }
 
       await axios.post(
         `${API_URL}/api/transactions/submit-swift`,
         { transactionIds: verifiedTransactions },
-        { headers: { Authorization: `Bearer ${token}` } },
-      )
+        { headers }
+      );
 
-      setVerifications({})
-      fetchTransactions()
-      alert("Transactions submitted to SWIFT successfully!")
-    } catch (error) {
-      alert("Failed to submit to SWIFT")
+      setVerifications({});
+      await fetchTransactions();
+      alert("Transactions submitted to SWIFT successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit to SWIFT");
     }
-  }
+  };
 
   const handleLogout = () => {
-    localStorage.removeItem("accessToken")
-    localStorage.removeItem("user")
-    navigate("/")
-  }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("user");
+    }
+    router.push("/");
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
         <p className="text-white text-xl">Loading transactions...</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -79,6 +113,7 @@ export default function EmployeeDashboard() {
         <button
           onClick={handleLogout}
           className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
+          type="button"
         >
           Logout
         </button>
@@ -87,7 +122,7 @@ export default function EmployeeDashboard() {
       {/* Header */}
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-white mb-2">Transaction Verification</h2>
-        <p className="text-slate-400">Employee: {user.username}</p>
+        <p className="text-slate-400">Employee: {parsedUser.username ?? "Employee"}</p>
       </div>
 
       {/* Transactions Table */}
@@ -106,12 +141,15 @@ export default function EmployeeDashboard() {
             </thead>
             <tbody>
               {transactions.length > 0 ? (
-                transactions.map((transaction, index) => (
-                  <tr key={index} className="border-b border-slate-700 hover:bg-slate-700 transition">
+                transactions.map((transaction) => (
+                  <tr
+                    key={transaction.id}
+                    className="border-b border-slate-700 hover:bg-slate-700 transition"
+                  >
                     <td className="px-6 py-4 text-white">{transaction.amount}</td>
                     <td className="px-6 py-4 text-white">{transaction.currency}</td>
-                    <td className="px-6 py-4 text-white">{transaction.payeeAccountName}</td>
-                    <td className="px-6 py-4 text-white font-mono">{transaction.payeeSwiftCode}</td>
+                    <td className="px-6 py-4 text-white">{transaction.payeeAccountName ?? "—"}</td>
+                    <td className="px-6 py-4 text-white font-mono">{transaction.payeeSwiftCode ?? "—"}</td>
                     <td className="px-6 py-4">
                       <span
                         className={`px-3 py-1 rounded-full text-sm font-semibold ${
@@ -120,22 +158,23 @@ export default function EmployeeDashboard() {
                             : "bg-blue-500/20 text-blue-400"
                         }`}
                       >
-                        {transaction.status}
+                        {transaction.status ?? "unknown"}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <input
                         type="checkbox"
-                        checked={verifications[transaction.id] || false}
+                        checked={!!verifications[transaction.id]}
                         onChange={() => handleVerify(transaction.id)}
                         className="w-5 h-5 cursor-pointer"
+                        aria-label={`Verify ${transaction.id}`}
                       />
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
                     No transactions to verify
                   </td>
                 </tr>
@@ -144,11 +183,12 @@ export default function EmployeeDashboard() {
           </table>
         </div>
 
-        {Object.values(verifications).some((v) => v) && (
+        {Object.values(verifications).some(Boolean) && (
           <div className="bg-slate-900 px-6 py-4 border-t border-slate-700">
             <button
               onClick={handleSubmitToSwift}
               className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition"
+              type="button"
             >
               Submit {Object.values(verifications).filter(Boolean).length} Verified Transactions to SWIFT
             </button>
@@ -156,5 +196,5 @@ export default function EmployeeDashboard() {
         )}
       </div>
     </div>
-  )
+  );
 }

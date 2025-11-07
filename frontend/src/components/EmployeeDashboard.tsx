@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useRouter } from "next/navigation";
 import apiClient from "../utils/api"
 import PendingPayments from "./PendingPayments"
 import PaymentVerification from "./PaymentVerification"
@@ -16,7 +16,7 @@ interface User {
 }
 
 export default function EmployeeDashboard() {
-  const navigate = useNavigate()
+  const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [activeTab, setActiveTab] = useState("pending")
   const [loading, setLoading] = useState(true)
@@ -34,7 +34,7 @@ export default function EmployeeDashboard() {
     } catch (err) {
       setError("Failed to load user data")
       setLoading(false)
-      navigate("/login")
+      router.push("/login")
     }
   }
 
@@ -43,7 +43,7 @@ export default function EmployeeDashboard() {
       await apiClient.post("/auth/logout")
       localStorage.removeItem("accessToken")
       localStorage.removeItem("user")
-      navigate("/login")
+      router.push("/login")
     } catch (err) {
       console.error("Logout error:", err)
     }

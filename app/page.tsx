@@ -1,66 +1,73 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
+import React, { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardAction,
+  CardFooter,
+} from "@/components/ui/card";
+
+import { Shield, Globe, Lock, Zap } from "lucide-react";
 
 export default function HomePage() {
-  const router = useRouter()
+  const router = useRouter();
 
   useEffect(() => {
     // Check if user is logged in
-    const token = localStorage.getItem("accessToken")
-    const user = localStorage.getItem("user")
+    const token = localStorage.getItem("accessToken");
+    const user = localStorage.getItem("user");
 
     if (token && user) {
       try {
-        const userData = JSON.parse(user)
+        const userData = JSON.parse(user);
         // Redirect based on role
         if (userData.role === "customer") {
-          router.push("/customer/dashboard")
+          router.push("/customer/dashboard");
         } else if (userData.role === "employee" || userData.role === "admin") {
-          router.push("/employee/dashboard")
+          router.push("/employee/dashboard");
         }
       } catch (error) {
-        console.error("Failed to parse user data")
+        console.error("Failed to parse user data");
       }
     }
-  }, [router])
+  }, [router]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+    <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
       {/* Hero Section */}
-      <div className="container mx-auto px-4 py-16">
-        <div className="flex flex-col items-center text-center space-y-8">
-          <div className="space-y-4">
-            <h1 className="text-5xl md:text-6xl font-bold text-white">
-              Secure International
-              <span className="block text-blue-500">Payment System</span>
-            </h1>
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-              Transfer money globally with bank-grade security, real-time verification, and complete transparency
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700">
-              <Link href="/register">Get Started</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/login">Sign In</Link>
-            </Button>
-          </div>
+      <div className="container mx-auto px-4 py-16 flex flex-col items-center text-center space-y-8">
+        <div className="space-y-4">
+          <h1 className="text-5xl md:text-6xl font-bold text-white">
+            Secure International
+            <span className="block text-blue-500">Payment System</span>
+          </h1>
+          <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+            Transfer money globally with bank-grade security, real-time verification, and complete transparency
+          </p>
         </div>
 
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col items-center justify-center px-4">
-      <div className="text-center max-w-2xl">
-        <h1 className="text-5xl font-bold text-white mb-4">Secure Bank International Payments</h1>
-        <p className="text-xl text-slate-300 mb-8">
-          A secure, enterprise-grade platform for international payment processing with advanced security features.
-        </p>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700">
+            <Link href="/register">Get Started</Link>
+          </Button>
+          <Button asChild size="lg" variant="outline">
+            <Link href="/login">Sign In</Link>
+          </Button>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-          {/* Customer Portal Card */}
+      {/* Portal Cards */}
+      <div className="container mx-auto px-4 flex flex-col items-center justify-center py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12 w-full max-w-5xl">
+          {/* Customer Portal */}
           <Link href="/login?role=customer">
             <div className="bg-slate-800 rounded-lg p-8 border border-slate-700 hover:border-blue-500 transition cursor-pointer transform hover:scale-105">
               <h2 className="text-2xl font-bold text-white mb-2">Customer Portal</h2>
@@ -69,7 +76,7 @@ export default function HomePage() {
             </div>
           </Link>
 
-          {/* Employee Portal Card */}
+          {/* Employee Portal */}
           <Link href="/login?role=employee">
             <div className="bg-slate-800 rounded-lg p-8 border border-slate-700 hover:border-purple-500 transition cursor-pointer transform hover:scale-105">
               <h2 className="text-2xl font-bold text-white mb-2">Employee Portal</h2>
@@ -80,50 +87,36 @@ export default function HomePage() {
         </div>
 
         {/* Features Grid */}
-        <div className="bg-slate-800 rounded-lg p-8 border border-slate-700 mb-12">
+        <div className="bg-slate-800 rounded-lg p-8 border border-slate-700 mb-12 w-full max-w-5xl">
           <h3 className="text-2xl font-bold text-white mb-6">Security Features</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-            <div className="flex items-start">
-              <span className="text-green-400 mr-3">✓</span>
-              <span className="text-slate-300">JWT Authentication + MFA</span>
-            </div>
-            <div className="flex items-start">
-              <span className="text-green-400 mr-3">✓</span>
-              <span className="text-slate-300">Bcrypt Password Hashing</span>
-            </div>
-            <div className="flex items-start">
-              <span className="text-green-400 mr-3">✓</span>
-              <span className="text-slate-300">Input Validation & Sanitization</span>
-            </div>
-            <div className="flex items-start">
-              <span className="text-green-400 mr-3">✓</span>
-              <span className="text-slate-300">HTTPS/TLS Encryption</span>
-            </div>
-            <div className="flex items-start">
-              <span className="text-green-400 mr-3">✓</span>
-              <span className="text-slate-300">Comprehensive Audit Logging</span>
-            </div>
-            <div className="flex items-start">
-              <span className="text-green-400 mr-3">✓</span>
-              <span className="text-slate-300">Rate Limiting & DDoS Protection</span>
-            </div>
-            <div className="flex items-start">
-              <span className="text-green-400 mr-3">✓</span>
-              <span className="text-slate-300">XSS & CSRF Protection</span>
-            </div>
-            <div className="flex items-start">
-              <span className="text-green-400 mr-3">✓</span>
-              <span className="text-slate-300">Role-Based Access Control</span>
-            </div>
+            {[
+              "JWT Authentication + MFA",
+              "Bcrypt Password Hashing",
+              "Input Validation & Sanitization",
+              "HTTPS/TLS Encryption",
+              "Comprehensive Audit Logging",
+              "Rate Limiting & DDoS Protection",
+              "XSS & CSRF Protection",
+              "Role-Based Access Control",
+            ].map((feature, idx) => (
+              <div key={idx} className="flex items-start">
+                <span className="text-green-400 mr-3">✓</span>
+                <span className="text-slate-300">{feature}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-20">
+        {/* Cards */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 w-full max-w-5xl">
           <Card className="bg-slate-900/50 border-slate-800">
             <CardHeader>
               <Shield className="h-10 w-10 text-blue-500 mb-2" />
               <CardTitle className="text-white">Bank-Grade Security</CardTitle>
-              <CardDescription>Multi-factor authentication, encryption, and advanced fraud detection</CardDescription>
+              <CardDescription>
+                Multi-factor authentication, encryption, and advanced fraud detection
+              </CardDescription>
             </CardHeader>
           </Card>
 
@@ -131,7 +124,9 @@ export default function HomePage() {
             <CardHeader>
               <Globe className="h-10 w-10 text-blue-500 mb-2" />
               <CardTitle className="text-white">Global Transfers</CardTitle>
-              <CardDescription>Send money to over 150 countries with competitive exchange rates</CardDescription>
+              <CardDescription>
+                Send money to over 150 countries with competitive exchange rates
+              </CardDescription>
             </CardHeader>
           </Card>
 
@@ -139,7 +134,9 @@ export default function HomePage() {
             <CardHeader>
               <Lock className="h-10 w-10 text-blue-500 mb-2" />
               <CardTitle className="text-white">Compliance First</CardTitle>
-              <CardDescription>Full regulatory compliance with KYC/AML standards and data protection</CardDescription>
+              <CardDescription>
+                Full regulatory compliance with KYC/AML standards and data protection
+              </CardDescription>
             </CardHeader>
           </Card>
 
@@ -147,7 +144,9 @@ export default function HomePage() {
             <CardHeader>
               <Zap className="h-10 w-10 text-blue-500 mb-2" />
               <CardTitle className="text-white">Fast Processing</CardTitle>
-              <CardDescription>Real-time verification and processing for urgent transfers</CardDescription>
+              <CardDescription>
+                Real-time verification and processing for urgent transfers
+              </CardDescription>
             </CardHeader>
           </Card>
         </div>
@@ -161,7 +160,7 @@ export default function HomePage() {
         </div>
 
         {/* Quick Links */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
           <Link
             href="/login"
             className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
@@ -176,6 +175,6 @@ export default function HomePage() {
           </Link>
         </div>
       </div>
-    </div>
-  )
+    </main>
+  );
 }

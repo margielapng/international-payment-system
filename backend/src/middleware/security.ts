@@ -67,12 +67,12 @@ export const authLimiter = rateLimit({
 
 // Data sanitization middleware
 export const sanitizeMiddleware = (req: Request, res: Response, next: NextFunction): void => {
-  // Sanitize inputs to prevent NoSQL injection
-  req.body = mongoSanitize()(req.body)
-  req.query = mongoSanitize()(req.query)
-  req.params = mongoSanitize()(req.params)
+  // cast to any to avoid strict typing complaints about unknown body/query/params shapes
+  req.body   = mongoSanitize(req.body as any);
+  req.query  = mongoSanitize(req.query as any);
+  req.params = mongoSanitize(req.params as any);
 
-  next()
+  next();
 }
 
 // HPP (HTTP Parameter Pollution) middleware

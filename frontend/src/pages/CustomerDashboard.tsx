@@ -1,16 +1,44 @@
-"use client"
+"use client";
 
-import React, { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import axios from "axios"
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+type PaymentState = {
+  amount: string;
+  currency: string;
+  provider: string;
+  payeeAccountName: string;
+  payeeAccountNumber: string;
+  payeeSwiftCode: string;
+  payeeBankName: string;
+};
+
+type FieldErrors = {
+  amount?: string;
+  payeeAccountName?: string;
+  payeeAccountNumber?: string;
+  payeeSwiftCode?: string;
+  payeeBankName?: string;
+  submit?: string;
+};
 
 export default function CustomerDashboard() {
-  const navigate = useNavigate()
-  const user = JSON.parse(localStorage.getItem("user") || "{}")
-  const [step, setStep] = useState(1)
-  const [payment, setPayment] = useState({
+  const router = useRouter();
+
+  // safely read user from localStorage (client-only)
+  let parsedUser: { username?: string; id?: string; role?: string } = {};
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+    parsedUser = raw ? JSON.parse(raw) : {};
+  } catch {
+    parsedUser = {};
+  }
+
+  const [step, setStep] = useState<number>(1);
+  const [payment, setPayment] = useState<PaymentState>({
     amount: "",
     currency: "ZAR",
     provider: "SWIFT",
@@ -18,76 +46,93 @@ export default function CustomerDashboard() {
     payeeAccountNumber: "",
     payeeSwiftCode: "",
     payeeBankName: "",
-  })
-  const [errors, setErrors] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState("")
+  });
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [loading, setLoading] = useState<boolean>(false);
+  const [success, setSuccess] = useState<string>("");
 
-  const validationRules = {
+  const validationRules: Record<string, RegExp> = {
     amount: /^\d+(\.\d{1,2})?$/,
     currency: /^[A-Z]{3}$/,
     payeeAccountName: /^[a-zA-Z\s'-]{2,50}$/,
     payeeAccountNumber: /^[0-9]{10,20}$/,
     payeeSwiftCode: /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/,
     payeeBankName: /^[a-zA-Z\s'-]{2,50}$/,
-  }
+  };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setPayment({ ...payment, [name]: value })
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: "" })
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setPayment((p) => ({ ...p, [name]: value }));
+    if ((errors as any)[name]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
-  }
+  };
 
-  const validateStep = (stepNum) => {
-    const newErrors = {}
+  const validateStep = (stepNum: number): boolean => {
+    const newErrors: FieldErrors = {};
+
     if (stepNum === 1) {
-      if (!validationRules.amount.test(payment.amount)) {
-        newErrors.amount = "Invalid amount format"
+      if (!validationRules.amount.test(String(payment.amount).trim())) {
+        newErrors.amount = "Invalid amount format (use numbers, optional 2 decimals)";
       }
     } else if (stepNum === 3) {
-      if (!validationRules.payeeAccountName.test(payment.payeeAccountName)) {
-        newErrors.payeeAccountName = "Invalid account name"
+      if (!validationRules.payeeAccountName.test(String(payment.payeeAccountName).trim())) {
+        newErrors.payeeAccountName = "Invalid account name";
       }
-      if (!validationRules.payeeAccountNumber.test(payment.payeeAccountNumber)) {
-        newErrors.payeeAccountNumber = "Invalid account number"
+      if (!validationRules.payeeAccountNumber.test(String(payment.payeeAccountNumber).trim())) {
+        newErrors.payeeAccountNumber = "Invalid account number";
       }
-      if (!validationRules.payeeSwiftCode.test(payment.payeeSwiftCode)) {
-        newErrors.payeeSwiftCode = "Invalid SWIFT code format"
+      if (!validationRules.payeeSwiftCode.test(String(payment.payeeSwiftCode).trim())) {
+        newErrors.payeeSwiftCode = "Invalid SWIFT code format";
       }
-      if (!validationRules.payeeBankName.test(payment.payeeBankName)) {
-        newErrors.payeeBankName = "Invalid bank name"
+      if (!validationRules.payeeBankName.test(String(payment.payeeBankName).trim())) {
+        newErrors.payeeBankName = "Invalid bank name";
       }
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handlePayNow = async () => {
-    if (!validateStep(3)) return
+    if (!validateStep(3)) return;
 
-    setLoading(true)
+    setLoading(true);
     try {
-      const token = localStorage.getItem("accessToken")
-      await axios.post(`${API_URL}/api/payments/create`, payment, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setSuccess("Payment submitted successfully! It will be verified by our team.")
-      setTimeout(() => setStep(1), 3000)
-    } catch (error) {
-      setErrors({ submit: error.response?.data?.error || "Payment failed" })
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+      const resp = await axios.post(`${API_URL}/api/payments/create`, payment, { headers });
+      if (resp?.data) {
+        setSuccess("Payment submitted successfully! It will be verified by our team.");
+        setTimeout(() => {
+          setStep(1);
+          setSuccess("");
+          setPayment((p) => ({
+            ...p,
+            amount: "",
+            payeeAccountName: "",
+            payeeAccountNumber: "",
+            payeeSwiftCode: "",
+            payeeBankName: "",
+          }));
+        }, 3000);
+      }
+    } catch (err: any) {
+      const message = err?.response?.data?.error || err?.message || "Payment failed";
+      setErrors({ submit: message });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleLogout = () => {
-    localStorage.removeItem("accessToken")
-    localStorage.removeItem("user")
-    navigate("/")
-  }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("user");
+    }
+    router.push("/");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-8">
@@ -97,6 +142,7 @@ export default function CustomerDashboard() {
         <button
           onClick={handleLogout}
           className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
+          type="button"
         >
           Logout
         </button>
@@ -104,8 +150,8 @@ export default function CustomerDashboard() {
 
       {/* Welcome */}
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-white mb-2">Welcome, {user.username}</h2>
-        <p className="text-slate-400">Account: {user.id}</p>
+        <h2 className="text-3xl font-bold text-white mb-2">Welcome, {parsedUser.username ?? "Customer"}</h2>
+        <p className="text-slate-400">Account: {parsedUser.id ?? "—"}</p>
       </div>
 
       {/* Payment Form */}
@@ -115,7 +161,8 @@ export default function CustomerDashboard() {
           <StepIndicator currentStep={step} totalSteps={3} />
         </div>
 
-        {success && <div className="alert-success mb-6">{success}</div>}
+        {success && <div className="mb-6 text-green-400">{success}</div>}
+        {errors.submit && <div className="mb-6 text-red-400">{errors.submit}</div>}
 
         {/* Step 1: Amount & Currency */}
         {step === 1 && (
@@ -131,7 +178,12 @@ export default function CustomerDashboard() {
 
             <div>
               <label className="block text-sm font-semibold text-white mb-2">Currency</label>
-              <select name="currency" value={payment.currency} onChange={handleChange} className="secure-input w-full">
+              <select
+                name="currency"
+                value={payment.currency}
+                onChange={handleChange}
+                className="secure-input w-full px-3 py-2 rounded-md bg-slate-900 text-white border border-slate-700"
+              >
                 <option value="ZAR">ZAR - South African Rand</option>
                 <option value="USD">USD - US Dollar</option>
                 <option value="EUR">EUR - Euro</option>
@@ -145,7 +197,7 @@ export default function CustomerDashboard() {
                 name="provider"
                 value={payment.provider}
                 onChange={handleChange}
-                className="secure-input w-full disabled:bg-slate-700"
+                className="secure-input w-full px-3 py-2 rounded-md bg-slate-900 text-white border border-slate-700 disabled:bg-slate-700"
                 disabled
               >
                 <option value="SWIFT">SWIFT</option>
@@ -153,8 +205,11 @@ export default function CustomerDashboard() {
             </div>
 
             <button
-              onClick={() => validateStep(1) && setStep(2)}
+              onClick={() => {
+                if (validateStep(1)) setStep(2);
+              }}
               className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white font-semibold rounded-lg transition"
+              type="button"
             >
               Next: Verify Details
             </button>
@@ -171,12 +226,14 @@ export default function CustomerDashboard() {
               <button
                 onClick={() => setStep(1)}
                 className="flex-1 py-3 border-2 border-sky-500 text-sky-400 font-semibold rounded-lg hover:bg-slate-700 transition"
+                type="button"
               >
                 Back
               </button>
               <button
                 onClick={() => setStep(3)}
                 className="flex-1 py-3 bg-sky-500 hover:bg-sky-600 text-white font-semibold rounded-lg transition"
+                type="button"
               >
                 Next: Payee Details
               </button>
@@ -227,6 +284,7 @@ export default function CustomerDashboard() {
               <button
                 onClick={() => setStep(2)}
                 className="flex-1 py-3 border-2 border-sky-500 text-sky-400 font-semibold rounded-lg hover:bg-slate-700 transition"
+                type="button"
               >
                 Back
               </button>
@@ -234,6 +292,7 @@ export default function CustomerDashboard() {
                 onClick={handlePayNow}
                 disabled={loading}
                 className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 text-white font-semibold rounded-lg transition"
+                type="button"
               >
                 {loading ? "Processing..." : "Pay Now"}
               </button>
@@ -242,10 +301,12 @@ export default function CustomerDashboard() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
-function StepIndicator({ currentStep, totalSteps }) {
+/* ---------- Helper subcomponents (typed) ---------- */
+
+function StepIndicator({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) {
   return (
     <div className="flex items-center gap-4">
       {Array.from({ length: totalSteps }).map((_, i) => (
@@ -263,31 +324,47 @@ function StepIndicator({ currentStep, totalSteps }) {
         </React.Fragment>
       ))}
     </div>
-  )
+  );
 }
 
-function FormField({ label, name, type = "text", value, onChange, error, placeholder }) {
+function FormField({
+  label,
+  name,
+  type = "text",
+  value,
+  onChange,
+  error,
+  placeholder,
+}: {
+  label: string;
+  name: keyof PaymentState;
+  type?: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  error?: string;
+  placeholder?: string;
+}) {
   return (
     <div>
       <label className="block text-sm font-semibold text-white mb-2">{label}</label>
       <input
         type={type}
-        name={name}
+        name={String(name)}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className={`secure-input w-full ${error ? "border-red-500" : ""}`}
+        className={`secure-input w-full px-3 py-2 rounded-md border ${error ? "border-red-500" : "border-slate-700"} bg-slate-900 text-white`}
       />
       {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
-  )
+  );
 }
 
-function ReviewField({ label, value }) {
+function ReviewField({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between items-center p-4 bg-slate-700 rounded-lg">
       <span className="text-slate-300">{label}</span>
       <span className="text-white font-semibold">{value}</span>
     </div>
-  )
+  );
 }

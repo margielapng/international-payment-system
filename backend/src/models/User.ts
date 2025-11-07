@@ -49,20 +49,21 @@ const UserSchema: Schema = new Schema(
       trim: true,
     },
     idNumber: {
-      type: String,
-      required: function () {
-        return this.role === "customer"
-      },
-      unique: true,
-      sparse: true,
-    },
-    email: {
-      type: String,
-      unique: true,
-      sparse: true,
-      trim: true,
-      lowercase: true,
-    },
+  type: String,
+  required: function (this: any): boolean {
+    return this.role === "customer";
+  },
+  unique: true,
+  sparse: true,
+},
+email: {
+  type: String,
+  unique: true,
+  sparse: true,
+  trim: true,
+  lowercase: true,
+},
+
     role: {
       type: String,
       enum: ["customer", "employee", "admin"],
